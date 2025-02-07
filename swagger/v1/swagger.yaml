@@ -1,0 +1,25 @@
+---
+openapi: 3.0.1
+info:
+  title: Line Server Problem
+  version: v1
+paths:
+  "/lines/{index}":
+    parameters:
+    - name: index
+      in: path
+      description: Line index in the file
+      required: true
+      schema:
+        type: string
+    get:
+      summary: show line
+      tags:
+      - Lines
+      responses:
+        '200':
+          description: Line successfully retrieved
+        '413':
+          description: Index out of range
+servers: {}
+definitions: {}

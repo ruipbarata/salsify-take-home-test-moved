@@ -53,7 +53,13 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  gem "rspec-rails"
+  gem "rswag-specs"
 end
 
 gem "amazing_print", "~> 1.7", ">= 1.7.2"
 gem "rails_semantic_logger", "~> 4.17"
+gem "rswag"
+gem "rswag-api"
+gem "rswag-ui"
