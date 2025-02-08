@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # https://guides.rubyonrails.org/install_ruby_on_rails.html
 
 # Install dependencies with apt
@@ -27,3 +25,6 @@ mise use -g ruby@3
 gem install rails
 
 sudo apt install -y redis-server
+
+# Reload shell configuration
+source ~/.bashrc

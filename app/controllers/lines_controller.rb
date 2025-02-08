@@ -3,6 +3,13 @@
 class LinesController < ApplicationController
   before_action :file_reader, only: :show
 
+  # GET /lines/:index
+  # Displays the line from the file corresponding to the provided index.
+  # Params:
+  # +index+:: the index of the line to be displayed (passed as a URL parameter)
+  # Responses:
+  # - 200 OK: Returns the line corresponding to the index.
+  # - 413 Payload Too Large: If the index is out of range.
   def show
     line_index = params[:index].to_i
 
@@ -18,7 +25,7 @@ class LinesController < ApplicationController
   private
 
   def file_reader
-    @file_reader ||= FileReaderCachelessService.new
+    @file_reader ||= FileReaderChunksService.new
   end
 
   def fetch_line(index)

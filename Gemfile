@@ -63,3 +63,5 @@ gem "rails_semantic_logger", "~> 4.17"
 gem "rswag"
 gem "rswag-api"
 gem "rswag-ui"
+gem "redis"
+

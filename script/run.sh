@@ -14,6 +14,8 @@ if ! pgrep -x "redis-server" > /dev/null; then
     redis-server --daemonize yes
 fi
 
-# echo redis-cli ping
+echo redis-cli ping
+
+bundle install
 
 rails server -b 0.0.0.0 -p 3000
