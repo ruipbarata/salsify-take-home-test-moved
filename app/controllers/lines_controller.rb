@@ -2,32 +2,26 @@
 
 class LinesController < ApplicationController
   FILE_PATH = Rails.root.join("script/data/fiile1.dat")
-  INDEX_FILE = Rails.root.join("script/data/index.dat")
-
-  before_action :load_index, only: [:show]
 
   # GET /lines/1
   def show
     line_index = params[:index].to_i
 
-    if line_index < 0 || line_index >= @line_offsets.size
+    if line_index < 0
       render(plain: "Line index out of range", status: :payload_too_large)
       return
     end
 
-    line = fetch_line(line_index)
-    render(plain: line, status: :ok)
+    line = fetch_line_from_cache(line_index)
+
+    if line.nil?
+      render(plain: "Line index out of range", status: :payload_too_large)
+    else
+      render(plain: line, status: :ok)
+    end
   end
 
   private
-
-  def load_index
-    unless File.exist?(INDEX_FILE)
-      generate_index
-    end
-
-    @line_offsets = File.readlines(INDEX_FILE).map(&:to_i)
-  end
 
   def generate_index
     offsets = []
@@ -40,12 +34,30 @@ class LinesController < ApplicationController
       end
     end
 
-    File.write(INDEX_FILE, offsets.join("\n"))
+    offsets
+  end
+
+  def fetch_line_from_cache(index)
+    cached_line = Rails.cache.read("line_#{index}")
+    return cached_line if cached_line
+
+    logger.debug("Cache miss for line #{index}")
+
+    line = fetch_line(index)
+    Rails.cache.write("line_#{index}", line) if line
+    line
   end
 
   def fetch_line(index)
+    line_offsets = Rails.cache.read("line_offsets")
+
+    unless line_offsets
+      line_offsets = generate_index
+      Rails.cache.write("line_offsets", line_offsets.to_json)
+    end
+
     File.open(FILE_PATH, "r") do |file|
-      file.seek(@line_offsets[index])
+      file.seek(line_offsets[index])
       return file.readline.chomp
     end
   end

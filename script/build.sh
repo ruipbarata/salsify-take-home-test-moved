@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # https://guides.rubyonrails.org/install_ruby_on_rails.html
 
 # Install dependencies with apt
@@ -23,3 +25,5 @@ eval "$($HOME/.local/bin/mise activate bash)"
 mise use -g ruby@3
 
 gem install rails
+
+sudo apt install -y redis-server
