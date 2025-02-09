@@ -6,7 +6,9 @@
 class FileReaderChunksService
   LINE_OFFSETS_CACHE_PREFIX = "line_offsets_block_" # Cache key prefix for storing line offsets in chunks
   LINE_CACHE_KEY_PREFIX = "line_" # Cache key prefix for storing individual lines
-  CHUNK_SIZE = 1000 # Number of line offsets stored per chunk
+  CHUNK_LOCK_KEY = "chunk_lock" # Cache key for locking the processing of a chunk
+  NEXT_BLOCK_CACHE_KEY = "next_line_offsets_block" # Cache key for storing the index of the next block to process
+  CHUNK_SIZE = ENV.fetch("FILE_READER_CHUNK_SIZE", 1000).to_i # Number of line offsets stored per chunk
 
   def initialize
     @file_path = ENV["FILE_PATH"]
@@ -19,20 +21,26 @@ class FileReaderChunksService
     return if index < 0
 
     # Try retrieving the line from cache; otherwise, read from the file
-    Rails.cache.fetch("#{LINE_CACHE_KEY_PREFIX}#{index}") do
-      read_line(index)
+    Rails.cache.fetch("#{@file_path}:#{LINE_CACHE_KEY_PREFIX}#{index}") do
+      offset = fetch_offset(index)
+      return unless offset
+
+      read_line(offset)
     end
   end
 
   private
 
-  # Reads a specific line from the file
-  # @param index [Integer] The index of the line to read
-  # @return [String, nil] The requested line or nil if it does not exist
-  def read_line(index)
-    offset = fetch_offset(index)
-    return unless offset
+  # Initializes a Redis connection
+  # @return [Redis] The Redis connection instance
+  def redis
+    @redis ||= Redis.new(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379"))
+  end
 
+  # Reads a specific line from the file
+  # @param offset [Integer] The start position of the line to read
+  # @return [String, nil] The requested line or nil if it is out of bounds
+  def read_line(offset)
     File.open(@file_path, "r") do |file|
       file.seek(offset)
       file.eof? ? nil : file.readline.chomp
@@ -45,18 +53,37 @@ class FileReaderChunksService
   def fetch_offset(index)
     chunk_index = index / CHUNK_SIZE
 
-    # Retrieve the offsets for the corresponding chunk from cache, generating it if necessary
-    offsets = Rails.cache.fetch("#{LINE_OFFSETS_CACHE_PREFIX}#{chunk_index}") do
-      load_and_cache_blocks(chunk_index)
-    end
+    loop do
+      # This is a workaround: for some reason, if there is no match in cache the first time we try to read the
+      # cache, it will return nil - witch is correct. But if we try to read it again, it will continue to return nil,
+      # even if there is a match in cache created by other instance.
+      # My theory is that Rails is caching the request to cache :D but I have not found any prof of that.
+      # Even if I do Rails.cache.exist?(key).
+      # To resolve this, I am using Redis directly to check if the key exists.
+      if redis.exists?("#{@file_path}:#{LINE_OFFSETS_CACHE_PREFIX}#{chunk_index}")
+        offsets = Rails.cache.read("#{@file_path}:#{LINE_OFFSETS_CACHE_PREFIX}#{chunk_index}")
+        return offsets[index % CHUNK_SIZE] if offsets
+      end
 
-    offsets[index % CHUNK_SIZE]
+      # If the offsets are not present, process and cache the chunk
+      lock_acquired = Rails.cache.write("#{@file_path}:#{CHUNK_LOCK_KEY}", chunk_index, unless_exist: true)
+      if lock_acquired
+        begin
+          offsets = load_and_cache_blocks(index, chunk_index)
+          return offsets[index % CHUNK_SIZE]
+        ensure
+          Rails.cache.delete("#{@file_path}:#{CHUNK_LOCK_KEY}")
+        end
+      end
+
+      sleep(1)
+    end
   end
 
   # Processes and stores offsets for chunks of the file
   # @param target_block_index [Integer] The index of the chunk being processed
   # @return [Array<Integer>] The list of offsets for the target chunk
-  def load_and_cache_blocks(target_chunk_index)
+  def load_and_cache_blocks(index, target_chunk_index)
     # Retrieve the next block index to determine the starting position
     next_chunk_index_to_process = fetch_next_chunk_index_to_process
     last_chunk_index_to_process = next_chunk_index_to_process == 0 ? 0 : next_chunk_index_to_process - 1
@@ -79,7 +106,7 @@ class FileReaderChunksService
           block_offsets << file.pos
         end
 
-        Rails.cache.write("#{LINE_OFFSETS_CACHE_PREFIX}#{curr_chunk_index}", block_offsets)
+        Rails.cache.write("#{@file_path}:#{LINE_OFFSETS_CACHE_PREFIX}#{curr_chunk_index}", block_offsets)
 
         target_block_offsets = block_offsets
 
@@ -87,7 +114,7 @@ class FileReaderChunksService
       end
     end
 
-    Rails.cache.write("#{LINE_OFFSETS_CACHE_PREFIX}next_block", target_chunk_index + 1)
+    Rails.cache.write("#{@file_path}:#{NEXT_BLOCK_CACHE_KEY}", target_chunk_index + 1)
 
     target_block_offsets
   end
@@ -95,13 +122,13 @@ class FileReaderChunksService
   # Retrieves the index of the next block to be processed
   # @return [Integer] The next block index
   def fetch_next_chunk_index_to_process
-    Rails.cache.read("#{LINE_OFFSETS_CACHE_PREFIX}next_block") || 0
+    Rails.cache.read("#{@file_path}:#{NEXT_BLOCK_CACHE_KEY}") || 0
   end
 
   # Retrieves the last stored offset of a given block from Redis
   # @param block_index [Integer] The block index
   # @return [Integer] The last offset of the specified block, or 0 if none exists
   def fetch_last_block_offset(chunk_index)
-    Rails.cache.read("#{LINE_OFFSETS_CACHE_PREFIX}#{chunk_index}")&.last || 0
+    Rails.cache.read("#{@file_path}:#{LINE_OFFSETS_CACHE_PREFIX}#{chunk_index}")&.last || 0
   end
 end

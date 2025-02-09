@@ -64,4 +64,3 @@ gem "rswag"
 gem "rswag-api"
 gem "rswag-ui"
 gem "redis"
-
