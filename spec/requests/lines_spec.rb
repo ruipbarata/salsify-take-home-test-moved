@@ -7,7 +7,7 @@ RSpec.describe("lines", type: :request) do
     parameter name: "index", in: :path, type: :string, description: "Line index in the file", required: true
 
     # GET method to show a line
-    get("show line") do
+    get("Get a line from a remote file") do
       tags "Lines"
       response(200, "Line successfully retrieved") do
         let(:index) { "1" }

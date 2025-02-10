@@ -1,12 +1,28 @@
 # Setup and Run
 
+
 First run the setup script.
+
 This will install all the necessary dependencies.
 
     ./script/build.sh
+
 Then star the server by running, whose file_path is the name of the file to serve
 
     ./script/run.sh <file_path>
+
+# Relevante file structure
+    app/
+    ├── controllers/
+    │   └── lines_controller.rb
+    ├── jobs/
+    │   └── pre_process_file_job.rb
+    └── services/
+        └── file_reader_chunks_service.rb
+    script/
+    ├── build.sh
+    └── run.sh
+
 
 # How does your system work?
 ### 1. Calculating and Storing Offsets
@@ -16,7 +32,7 @@ The main goal is to avoid reading large files completely on each request. To do 
 - **Storage Structure**: The offsets array is divided into **chunks**. Each chunk contains, for example, 1000 offsets. These chunks are stored in the Redis cache, allowing efficient offset fetching.
 
 ### 2. Reading Lines Using Offsets
-- **Offset Access**: When a line is requested, I calculate in which chunk the line index is present. The corresponding chunk is then fetched from the cache.
+- **Offset Access**: When a line is requested, it is calculated in which chunk the line index is present. The corresponding chunk is then fetched from the cache.
 - If the chunk is already stored in the cache, it is loaded into memory.
 - Otherwise, the file is read from the last processed chunk to the end of the requested chunk, minimizing the amount of unnecessary reading.
 - **Cache Fetching**: When the offset chunk is found in the cache, the index of the desired line is retrieved from the offset array. From that position, the line is read from the file and returned to the client.
@@ -26,7 +42,7 @@ The main goal is to avoid reading large files completely on each request. To do 
 - **Locking and Retry Strategy**: If another process is generating the requested chunk, the process enters a **retry** cycle, waiting for the lock to be released or for the writing process to be completed in the cache.
 
 ### 4. Storing Content in the Cache
-- The content of the lines is also stored in the Redis cache. I use the line index as the key to store the content, which facilitates the efficient search for the line in the cache in subsequent requests.
+- The content of the lines is also stored in the Redis cache. The line index is used as the key to store the content, which facilitates the efficient search for the line in the cache in subsequent requests.
 - **Avoiding Repeated Processing**: By storing the lines in the cache, we avoid reading and processing the file repeatedly, saving computational resources.
 
 ### 5. Preprocessing
@@ -50,7 +66,7 @@ And the offsets calculated as
 
     [0, 7, 14, ...]
 
-- **Request for Line 1** (index 1): The system verifies that line 1 is in **chunk 0** and retrieves offset `7`. From this position, the file is read and the line "Line 2" is returned.
+- **Request for 'Line 2'** (index 1): The system verifies that line 1 is in **chunk 0** and retrieves offset `7`. From this position, the file is read and the line "Line 2" is returned.
 - The content of line 1 is stored in the cache for future requests.
 
 ### The following diagram should help you better understand the flow:
@@ -64,7 +80,7 @@ Proper Redis memory management and fine-tuning of cache eviction policies will b
 
 # How will your system perform with 100 users? 10000 users? 1000000 users?
 The system should support many concurrent users with ease, as Redis is designed for high concurrency. 
-The caching mechanism will prevent file readings, ensuring fast access even under high load. Additionally, I am using Puma, a multi-threaded and multi-process web server, which efficiently handles concurrent requests by leveraging multiple CPU cores.
+The caching mechanism will prevent file readings, ensuring fast access even under high load. Additionally, it is using Puma, a multi-threaded and multi-process web server, which efficiently handles concurrent requests by leveraging multiple CPU cores.
 As the number of clientes scale to the millions, Redis migth become bottleneck, especially if many users request different lines from the file simultaneously.
 To support this load, tuning up the chunks or even horizontal scaling of Redis and sharding may be necessary.
 

@@ -13,7 +13,7 @@ paths:
       schema:
         type: string
     get:
-      summary: show line
+      summary: Get a line from a remote file
       tags:
       - Lines
       responses:
