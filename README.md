@@ -1,3 +1,13 @@
+# Setup and Run
+
+First run the setup script.
+This will install all the necessary dependencies.
+
+    ./script/build.sh
+Then star the server by running, whose file_path is the name of the file to serve
+
+    ./script/run.sh <file_path>
+
 # How does your system work?
 ### 1. Calculating and Storing Offsets
 The main goal is to avoid reading large files completely on each request. To do this, I use **offsets**, which represent the starting positions of each line in the file. The process for generating and storing these offsets is as follows:
