@@ -80,8 +80,8 @@ class FileReaderChunksService
   def load_and_cache_blocks(index, target_chunk_index)
     # Retrieve the next block index to determine the starting position
     next_chunk_index_to_process = Rails.cache.read(next_block_cache_key) || 0
-    last_chunk_index_to_process = next_chunk_index_to_process == 0 ? 0 : next_chunk_index_to_process - 1
-    start_offset = next_chunk_index_to_process == 0 ? 0 : Rails.cache.read(line_offsets_cache_key(last_chunk_index_to_process))&.last || 0
+    last_chunk_index_processed = next_chunk_index_to_process == 0 ? 0 : next_chunk_index_to_process - 1
+    start_offset = next_chunk_index_to_process == 0 ? 0 : Rails.cache.read(line_offsets_cache_key(last_chunk_index_processed))&.last || 0
 
     target_block_offsets = []
 
