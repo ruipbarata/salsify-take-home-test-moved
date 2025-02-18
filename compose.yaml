@@ -1,0 +1,27 @@
+services:
+  rails:
+    container_name: rails
+    build:
+      context: ./
+      dockerfile: docker/development/Dockerfile
+    command: bash -c "rm -f tmp/pids/server.pid && bin/rails s -p 3000 -b '0.0.0.0'"
+    volumes:
+      - .:/usr/src/app
+      - bundle:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis 
+    # env_file:
+    #   - .env
+    # environment:
+    #   - HISTFILE=/usr/src/app/log/.bash_history
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  bundle:
